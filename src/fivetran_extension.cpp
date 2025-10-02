@@ -2,6 +2,7 @@
 
 #include "fivetran_extension.hpp"
 #include "functions.hpp"
+#include "optimizers.hpp"
 
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
@@ -11,7 +12,8 @@
 namespace duckdb {
 
 static void LoadInternal(ExtensionLoader &loader) {
-	loader.RegisterFunction(StructToSparseVariantFun::GetFunction());
+	loader.RegisterFunction(FivetranFunctions::GetStructToSparseVariantFunction());
+	loader.GetDatabaseInstance().config.optimizer_extensions.push_back(FivetranOptimizers::GetSparseBuildOptimizer());
 }
 
 void FivetranExtension::Load(ExtensionLoader &loader) {

@@ -1,19 +1,19 @@
 //===----------------------------------------------------------------------===//
 //                         DuckDB
 //
-// functions.hpp
+// optimizers.hpp
 //
 //
 //===----------------------------------------------------------------------===//
 
 #pragma once
 
-#include "duckdb/function/scalar_function.hpp"
+#include "duckdb/optimizer/optimizer_extension.hpp"
 
 namespace duckdb {
 
-struct FivetranFunctions {
-	static ScalarFunction GetStructToSparseVariantFunction();
+struct FivetranOptimizers {
+	static OptimizerExtension GetSparseBuildOptimizer();
 };
 
 } // namespace duckdb
