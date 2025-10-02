@@ -2,6 +2,8 @@
 # description: test struct_to_sparse_variant function
 # group: [sql]
 
+require fivetran
+
 # if there are no NULL values, it's the same as casting to VARIANT
 query I
 select struct_to_sparse_variant({duck:42})
