@@ -28,6 +28,19 @@ select struct_to_sparse_variant({goose:NULL})
 ----
 NULL
 
+# test case that was giving issues before
+query I
+select struct_to_sparse_variant(c)
+from (values
+    ({'pk': NULL, 'double_col_0': NULL}),
+    ({'pk': 3, 'double_col_0': NULL}),
+    ({'pk': NULL, 'double_col_0': 0.9046340894709217}),
+) tbl(c)
+----
+NULL
+{'pk': 3}
+{'double_col_0': 0.9046340894709217}
+
 # skips enum/union because this can't roundtrip
 query I
 with cte1 as (

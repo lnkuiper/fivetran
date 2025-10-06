@@ -211,6 +211,7 @@ bool ConvertStructToSparseVariant(ToVariantSourceData &source, ToVariantGlobalRe
 					result.keys_selvec.set_index(keys_offset + non_null_idx, dictionary_indices[child_idx]);
 					non_null_idx++;
 				}
+				D_ASSERT(non_null_idx == non_null_child_count);
 				//! Map from index of the child to the children.values_index of the parent
 				//! NOTE: this maps to the first index, below we are forwarding this for each child Vector we process.
 				sel.children_selection.set_index(sel.count, children_index);
@@ -251,10 +252,9 @@ bool ConvertStructToSparseVariant(ToVariantSourceData &source, ToVariantGlobalRe
 			//! Now forward the selection to point to the next index in the children.values_index
 			const auto &child_format = child_source_data[child_idx].source_format;
 			for (idx_t i = 0; i < sel.count; i++) {
-				if (!source_validity.RowIsValid(source[i]) || non_null_child_counts[i] == 0) {
-					continue;
-				}
-				if (child_format.validity.RowIsValid(child_format.sel->get_index(i))) {
+				const auto idx = sel.non_null_selection.get_index(i);
+				D_ASSERT(source_validity.RowIsValid(idx) || non_null_child_counts[idx] != 0);
+				if (child_format.validity.RowIsValid(child_format.sel->get_index(idx))) {
 					sel.children_selection[i]++;
 				}
 			}

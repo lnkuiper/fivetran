@@ -1,0 +1,70 @@
+# name: test/sql/sparse_build_optimizer.test
+# description: test the SparseBuildOptimizer
+# group: [sql]
+
+require fivetran
+
+statement ok
+set disabled_optimizers to 'column_lifetime'
+
+statement ok
+create view input_data as
+select
+    range pk,
+    random() as double_col_0,
+    random() as double_col_1,
+    random() as double_col_2,
+    random() as double_col_3,
+    random() as double_col_4,
+    hash(random()) as long_col_0,
+    hash(random()) as long_col_1,
+    hash(random()) as long_col_2,
+    hash(random()) as long_col_3,
+    hash(random()) as long_col_4,
+    'longstring' || hash(random()) as string_col_0,
+    'longstring' || hash(random()) as string_col_1,
+    'longstring' || hash(random()) as string_col_2,
+    'longstring' || hash(random()) as string_col_3,
+    'longstring' || hash(random()) as string_col_4,
+from
+    range(10)
+
+statement ok
+create macro maybe_null(c, p) as
+case when random() < p then c else null end
+
+statement ok
+create table build as
+select maybe_null(columns(*), 0.1)
+from input_data
+
+statement ok
+select struct_to_sparse_variant(build)
+from build
+
+statement ok
+create table probe as
+select input_data.*
+from input_data, range(10)
+
+statement ok
+select
+    pk,
+    coalesce(b.double_col_0, p.double_col_0),
+    coalesce(b.double_col_1, p.double_col_1),
+    coalesce(b.double_col_2, p.double_col_2),
+    coalesce(b.double_col_3, p.double_col_3),
+    coalesce(b.double_col_4, p.double_col_4),
+    coalesce(b.long_col_0, p.long_col_0),
+    coalesce(b.long_col_1, p.long_col_1),
+    coalesce(b.long_col_2, p.long_col_2),
+    coalesce(b.long_col_3, p.long_col_3),
+    coalesce(b.long_col_4, p.long_col_4),
+    coalesce(b.string_col_0, p.string_col_0),
+    coalesce(b.string_col_1, p.string_col_1),
+    coalesce(b.string_col_2, p.string_col_2),
+    coalesce(b.string_col_3, p.string_col_3),
+    coalesce(b.string_col_4, p.string_col_4),
+from probe p
+left join build b
+using (pk)
