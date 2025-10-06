@@ -5,45 +5,46 @@
 require fivetran
 
 statement ok
-create view input_data as
-select
-    range pk,
-    random() as double_col_0,
-    random() as double_col_1,
-    random() as double_col_2,
-    random() as double_col_3,
-    random() as double_col_4,
-    hash(random()) as long_col_0,
-    hash(random()) as long_col_1,
-    hash(random()) as long_col_2,
-    hash(random()) as long_col_3,
-    hash(random()) as long_col_4,
-    'longstring' || hash(random()) as string_col_0,
-    'longstring' || hash(random()) as string_col_1,
-    'longstring' || hash(random()) as string_col_2,
-    'longstring' || hash(random()) as string_col_3,
-    'longstring' || hash(random()) as string_col_4,
-from
-    range(10)
-
-statement ok
 create macro maybe_null(c, p) as
 case when random() < p then c else null end
 
 statement ok
-create table build as
-select maybe_null(columns(*), 0.1)
-from input_data
+create macro input_data(nrow, pnonnull) as table (
+    with cte as (
+        select
+            range pk,
+            random() as double_col_0,
+            random() as double_col_1,
+            random() as double_col_2,
+            random() as double_col_3,
+            random() as double_col_4,
+            hash(random()) as long_col_0,
+            hash(random()) as long_col_1,
+            hash(random()) as long_col_2,
+            hash(random()) as long_col_3,
+            hash(random()) as long_col_4,
+            'longstring' || hash(random()) as string_col_0,
+            'longstring' || hash(random()) as string_col_1,
+            'longstring' || hash(random()) as string_col_2,
+            'longstring' || hash(random()) as string_col_3,
+            'longstring' || hash(random()) as string_col_4,
+        from
+            range(nrow)
+    )
+    select maybe_null(columns(*), pnonnull) as "\0"
+    from cte
+)
 
 # quick check that struct_to_sparse_variant can handle this input
 statement ok
-select struct_to_sparse_variant(build)
-from build
+select struct_to_sparse_variant(id)
+from input_data(10, 0.1) id
 
 statement ok
-create table probe as
-select input_data.*
-from input_data, range(10)
+create or replace table build as from input_data(10, 0.1)
+
+statement ok
+create or replace table probe as from input_data(10, 1), range(10)
 
 # test each query with and without optimizer enabled, should yield same results
 foreach do '' 'extension'
@@ -72,6 +73,7 @@ select
 from probe p
 left join build b
 using (pk)
+order by all
 ----
 
 
