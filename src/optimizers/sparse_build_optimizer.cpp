@@ -139,7 +139,12 @@ private:
 
 		// Get RHS columns from the VARIANT
 		const auto variant_extract_fun_set = VariantExtractFun::GetFunctions();
-		for (idx_t col_idx = 0; col_idx < rhs_bindings.size(); ++col_idx) {
+		const auto actual_rhs_cols = comparison_join.right_projection_map.empty()
+		                                 ? rhs_bindings.size()
+		                                 : comparison_join.right_projection_map.size();
+		for (idx_t i = 0; i < actual_rhs_cols; i++) {
+			const auto col_idx =
+			    comparison_join.right_projection_map.empty() ? i : comparison_join.right_projection_map[i];
 			// Create a variant_extract expression
 			auto variant_extract_fun = variant_extract_fun_set.functions[0];
 			vector<unique_ptr<Expression>> variant_extract_arguments;
@@ -163,6 +168,9 @@ private:
 
 			projection_out_expressions.push_back(std::move(cast_expr));
 		}
+
+		// This now needs to be cleared since we're not building on many payload columns anymore (just one VARIANT)
+		comparison_join.right_projection_map.clear();
 
 		// Place the projection on top of the plan
 		auto projection_out = make_uniq<LogicalProjection>(input.optimizer.binder.GenerateTableIndex(),

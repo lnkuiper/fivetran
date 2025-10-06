@@ -5,9 +5,6 @@
 require fivetran
 
 statement ok
-set disabled_optimizers to 'column_lifetime'
-
-statement ok
 create view input_data as
 select
     range pk,
@@ -38,6 +35,7 @@ create table build as
 select maybe_null(columns(*), 0.1)
 from input_data
 
+# quick check that struct_to_sparse_variant can handle this input
 statement ok
 select struct_to_sparse_variant(build)
 from build
@@ -47,9 +45,15 @@ create table probe as
 select input_data.*
 from input_data, range(10)
 
+# test each query with and without optimizer enabled, should yield same results
+foreach do '' 'extension'
+
 statement ok
+set disabled_optimizers to ${do}
+
+query IIIIIIIIIIIIIIII nosort q0
 select
-    pk,
+    p.pk,
     coalesce(b.double_col_0, p.double_col_0),
     coalesce(b.double_col_1, p.double_col_1),
     coalesce(b.double_col_2, p.double_col_2),
@@ -68,3 +72,7 @@ select
 from probe p
 left join build b
 using (pk)
+----
+
+
+endloop
