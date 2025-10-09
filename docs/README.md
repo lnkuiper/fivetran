@@ -5,7 +5,7 @@ This repository contains the DuckDB Fivetran Community extension.
 This extension adds the following scalar functions.
 
 ### `struct_to_sparse_variant`
-T
+This function casts a `STRUCT` to a `VARIANT`, but omits the `NULL` values.
 ```sql
 select struct_to_sparse_variant({duck:42,goose:NULL});
 -- {'duck': 42}

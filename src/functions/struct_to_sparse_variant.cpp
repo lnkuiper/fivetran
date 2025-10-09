@@ -326,8 +326,8 @@ static bool StructToSparseVariant(DataChunk &args, ExpressionState &, Vector &re
 } // namespace variant
 
 ScalarFunction FivetranFunctions::GetStructToSparseVariantFunction() {
-	ScalarFunction fun("struct_to_sparse_variant", {LogicalType::ANY}, LogicalType::VARIANT(),
-	                   variant::StructToSparseVariant);
+	ScalarFunction fun("struct_to_sparse_variant", {LogicalType::STRUCT({{"any", LogicalType::ANY}})},
+	                   LogicalType::VARIANT(), variant::StructToSparseVariant);
 	return fun;
 }
 
