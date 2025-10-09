@@ -3,6 +3,7 @@
 #include "fivetran_extension.hpp"
 #include "functions.hpp"
 #include "optimizers.hpp"
+#include "settings.hpp"
 
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
@@ -11,9 +12,17 @@
 
 namespace duckdb {
 
+template <class SETTING>
+void AddSetting(DBConfig &config) {
+	config.AddExtensionOption(SETTING::NAME, SETTING::DESCRIPTION, SETTING::TYPE, Value(SETTING::DEFAULT_VALUE));
+}
+
 static void LoadInternal(ExtensionLoader &loader) {
 	loader.RegisterFunction(FivetranFunctions::GetStructToSparseVariantFunction());
 	loader.GetDatabaseInstance().config.optimizer_extensions.push_back(FivetranOptimizers::GetSparseBuildOptimizer());
+
+	auto &config = DBConfig::GetConfig(loader.GetDatabaseInstance());
+	AddSetting<SparseBuildOptimizerColumnsThresholdSetting>(config);
 }
 
 void FivetranExtension::Load(ExtensionLoader &loader) {

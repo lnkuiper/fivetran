@@ -1,8 +1,10 @@
 #include "optimizers.hpp"
-
 #include "functions.hpp"
+#include "settings.hpp"
+
 #include "duckdb/function/scalar/struct_functions.hpp"
 #include "duckdb/function/scalar/variant_functions.hpp"
+#include "duckdb/main/config.hpp"
 #include "duckdb/optimizer/optimizer.hpp"
 #include "duckdb/optimizer/column_binding_replacer.hpp"
 #include "duckdb/planner/binder.hpp"
@@ -23,20 +25,13 @@ public:
 	}
 
 private:
-#ifdef DEBUG
-	static constexpr idx_t BUILD_COLUMN_THRESHOLD = 0;
-#else
-	static constexpr idx_t BUILD_COLUMN_THRESHOLD = 10;
-#endif
-
-private:
 	static void OptimizeInternal(OptimizerExtensionInput &input, unique_ptr<LogicalOperator> &plan,
 	                             LogicalOperator &root) {
 		for (auto &child : plan->children) {
 			OptimizeInternal(input, child, root);
 		}
 
-		if (!IsEligible(*plan)) {
+		if (!IsEligible(input, *plan)) {
 			return;
 		}
 
@@ -45,14 +40,10 @@ private:
 		ReplaceBindings(plan, root, bindings_before);
 	}
 
-	static bool IsEligible(const LogicalOperator &op) {
+	static bool IsEligible(OptimizerExtensionInput &input, const LogicalOperator &op) {
 		if (op.type != LogicalOperatorType::LOGICAL_COMPARISON_JOIN) {
 			return false;
 		}
-		if (op.children[1]->types.size() < BUILD_COLUMN_THRESHOLD) {
-			return false;
-		}
-
 		const auto &comparison_join = op.Cast<LogicalComparisonJoin>();
 		switch (comparison_join.join_type) {
 		case JoinType::LEFT:
@@ -67,13 +58,23 @@ private:
 			}
 		}
 
-		// TODO need to do something about RHS projection map!
+		Value threshold_value;
+		DBConfig::GetConfig(input.context)
+		    .TryGetCurrentSetting(SparseBuildOptimizerColumnsThresholdSetting::NAME, threshold_value);
+		const auto threshold = threshold_value.GetValue<int64_t>();
+		if (threshold < 0) {
+			return false;
+		}
+
+		if (op.children[1]->types.size() < threshold) {
+			return false;
+		}
 
 		return true;
 	}
 
 	static void SparsifyBuild(OptimizerExtensionInput &input, unique_ptr<LogicalOperator> &plan) {
-		D_ASSERT(IsEligible(*plan));
+		D_ASSERT(IsEligible(input, *plan));
 		auto &comparison_join = plan->Cast<LogicalComparisonJoin>();
 
 		const auto lhs_bindings = comparison_join.children[0]->GetColumnBindings();

@@ -44,14 +44,50 @@ statement ok
 create or replace table build as from input_data(10, 0.1)
 
 statement ok
-create or replace table probe as from input_data(10, 1), range(10)
+create or replace table probe as from input_data(10, 1), range(30)
+
+# test that the optimization is triggered by inspecting the plan
+statement ok
+PRAGMA explain_output = 'OPTIMIZED_ONLY'
+
+query II
+explain select
+    p.pk,
+    coalesce(b.double_col_0, p.double_col_0),
+    coalesce(b.double_col_1, p.double_col_1),
+    coalesce(b.double_col_2, p.double_col_2),
+    coalesce(b.double_col_3, p.double_col_3),
+    coalesce(b.double_col_4, p.double_col_4),
+    coalesce(b.long_col_0, p.long_col_0),
+    coalesce(b.long_col_1, p.long_col_1),
+    coalesce(b.long_col_2, p.long_col_2),
+    coalesce(b.long_col_3, p.long_col_3),
+    coalesce(b.long_col_4, p.long_col_4),
+    coalesce(b.string_col_0, p.string_col_0),
+    coalesce(b.string_col_1, p.string_col_1),
+    coalesce(b.string_col_2, p.string_col_2),
+    coalesce(b.string_col_3, p.string_col_3),
+    coalesce(b.string_col_4, p.string_col_4),
+from probe p
+left join build b
+using (pk)
+order by all
+----
+logical_opt	<REGEX>:.*struct_to_sparse_variant.*
 
 # test each query with and without optimizer enabled, should yield same results
-foreach do '' 'extension'
+foreach threshold -1 0
+
+statement ok
+set fivetran_sparse_build_optimizer_column_threshold to ${threshold}
+
+# this tests with/without projection maps
+foreach do '' 'column_lifetime'
 
 statement ok
 set disabled_optimizers to ${do}
 
+# test with a bunch of different column combinations
 query IIIIIIIIIIIIIIII nosort q0
 select
     p.pk,
@@ -76,5 +112,54 @@ using (pk)
 order by all
 ----
 
+query IIIIIIIIIIIIIIII nosort q1
+select
+    p.pk,
+    b.double_col_0,
+    p.double_col_1,
+    b.double_col_2,
+    p.double_col_3,
+    b.double_col_4,
+    p.long_col_0,
+    b.long_col_1,
+    p.long_col_2,
+    b.long_col_3,
+    p.long_col_4,
+    b.string_col_0,
+    p.string_col_1,
+    b.string_col_2,
+    p.string_col_3,
+    b.string_col_4,
+from probe p
+left join build b
+using (pk)
+order by all
+----
+
+query IIIIIIIIIIIIIIII nosort q2
+select
+    p.pk,
+    b.double_col_0,
+    b.double_col_1,
+    b.double_col_2,
+    b.double_col_3,
+    b.double_col_4,
+    b.long_col_0,
+    b.long_col_1,
+    b.long_col_2,
+    b.long_col_3,
+    b.long_col_4,
+    b.string_col_0,
+    b.string_col_1,
+    b.string_col_2,
+    b.string_col_3,
+    b.string_col_4,
+from probe p
+left join build b
+using (pk)
+order by all
+----
+
+endloop
 
 endloop

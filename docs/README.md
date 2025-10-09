@@ -1,14 +1,150 @@
-# DuckDB Extension Template
-This repository contains a template for creating a DuckDB extension. The main goal of this template is to allow users to easily develop, test and distribute their own DuckDB extension. The main branch of the template is always based on the latest stable DuckDB allowing you to try out your extension right away.
+# DuckDB Fivetran Community Extension
+This repository contains the DuckDB Fivetran Community extension.
 
-## Getting started
-First step to getting started is to create your own repo from this template by clicking `Use this template`. Then clone your new repository using 
-```sh
-git clone --recurse-submodules https://github.com/<you>/<your-new-extension-repo>.git
+## Scalar Functions
+This extension adds the following scalar functions.
+
+### `struct_to_sparse_variant`
+T
+```sql
+select struct_to_sparse_variant({duck:42,goose:NULL});
+-- {'duck': 42}
+select struct_to_sparse_variant({duck:NULL,goose:42});
+-- {'goose': 42}
+
+-- we cannot create empty STRUCTs (even within VARIANT),
+-- so if all fields are NULL, the entire VARIANT becomes NULL
+select struct_to_sparse_variant({goose:NULL});
+-- NULL
 ```
-Note that `--recurse-submodules` will ensure DuckDB is pulled which is required to build the extension.
 
-## Building
+## Optimizers
+This extension adds the following optimizers.
+
+### `SparseBuildOptimizer`
+This optimizer identifies `LEFT` joins in query plans, and packs non-key columns on the build side into a `VARIANT` using `struct_to_sparse_variant`, significantly reducing the size of the build side if it contains many `NULL` values.
+
+```sql
+-- helper macro to generate NULL values
+create macro maybe_null(c, p) as
+case when random() < p then c else null end;
+-- macro to generate tables
+create macro input_data(nrow, pnonnull) as table (
+    with cte as (
+        select
+            range pk,
+            random() as double_col_0,
+            hash(random()) as long_col_0,
+            'longstring' || hash(random()) as string_col_0,
+        from
+            range(nrow)
+    )
+    select maybe_null(columns(*), pnonnull) as "\0"
+    from cte
+);
+-- generate build/probe tables
+create or replace table build as from input_data(10, 0.1);
+create or replace table probe as from input_data(10, 1), range(30);
+-- visualize query plan
+explain select
+    p.pk,
+    coalesce(b.double_col_0, p.double_col_0),
+    coalesce(b.long_col_0, p.long_col_0),
+    coalesce(b.string_col_0, p.string_col_0),
+from probe p
+left join build b
+using (pk);
+--┌─────────────────────────────┐
+--│┌───────────────────────────┐│
+--││       Physical Plan       ││
+--│└───────────────────────────┘│
+--└─────────────────────────────┘
+--┌───────────────────────────┐
+--│         PROJECTION        │
+--│    ────────────────────   │
+--│             pk            │
+--│   COALESCE(double_col_0,  │
+--│        double_col_0)      │
+--│    COALESCE(long_col_0,   │
+--│         long_col_0)       │
+--│   COALESCE(string_col_0,  │
+--│        string_col_0)      │
+--│                           │
+--│         ~300 rows         │
+--└─────────────┬─────────────┘
+--┌─────────────┴─────────────┐
+--│         PROJECTION        │
+--│    ────────────────────   │
+--│             #0            │
+--│             #1            │
+--│             #2            │
+--│             #3            │
+--│ CAST(TRY(variant_extract( │
+--│   #5, 'c0')) AS BIGINT)   │
+--│ CAST(TRY(variant_extract( │
+--│   #5, 'c1')) AS DOUBLE)   │
+--│ CAST(TRY(variant_extract( │
+--│   #5, 'c2')) AS UBIGINT)  │
+--│ CAST(TRY(variant_extract( │
+--│   #5, 'c3')) AS VARCHAR)  │
+--│                           │
+--│          ~0 rows          │
+--└─────────────┬─────────────┘
+--┌─────────────┴─────────────┐
+--│         HASH_JOIN         │
+--│    ────────────────────   │
+--│      Join Type: LEFT      │
+--│    Conditions: pk = pk    ├──────────────┐
+--│                           │              │
+--│         ~300 rows         │              │
+--└─────────────┬─────────────┘              │
+--┌─────────────┴─────────────┐┌─────────────┴─────────────┐
+--│         SEQ_SCAN          ││         PROJECTION        │
+--│    ────────────────────   ││    ────────────────────   │
+--│        Table: probe       ││             pk            │
+--│   Type: Sequential Scan   ││  struct_to_sparse_variant │
+--│                           ││  (struct_pack(c0, c1, c2, │
+--│        Projections:       ││            c3))           │
+--│             pk            ││                           │
+--│        double_col_0       ││                           │
+--│         long_col_0        ││                           │
+--│        string_col_0       ││                           │
+--│                           ││                           │
+--│         ~300 rows         ││          ~10 rows         │
+--└───────────────────────────┘└─────────────┬─────────────┘
+--                             ┌─────────────┴─────────────┐
+--                             │         SEQ_SCAN          │
+--                             │    ────────────────────   │
+--                             │        Table: build       │
+--                             │   Type: Sequential Scan   │
+--                             │                           │
+--                             │        Projections:       │
+--                             │             pk            │
+--                             │        double_col_0       │
+--                             │         long_col_0        │
+--                             │        string_col_0       │
+--                             │                           │
+--                             │          ~10 rows         │
+--                             └───────────────────────────┘
+```
+
+## Settings
+This extension adds the following settings.
+
+### `fivetran_sparse_build_optimizer_column_threshold`
+Configuration setting for `SparseBuildOptimizer`.
+It defaults to 10.
+
+```sql
+-- disables the SparseBuildOptimizer
+set fivetran_sparse_build_optimizer_column_threshold to -1;
+-- enables the SparseBuildOptimizer for join builds >= 10 columns
+set fivetran_sparse_build_optimizer_column_threshold to 10;
+```
+
+# Building
+From https://github.com/duckdb/extension-template.
+
 ### Managing dependencies
 DuckDB extensions uses VCPKG for dependency management. Enabling VCPKG is very simple: follow the [installation instructions](https://vcpkg.io/en/getting-started) or just run the following:
 ```shell
