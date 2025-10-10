@@ -38,6 +38,7 @@ private:
 		const auto bindings_before = plan->GetColumnBindings();
 		SparsifyBuild(input, plan);
 		ReplaceBindings(plan, root, bindings_before);
+		root.ResolveOperatorTypes();
 	}
 
 	static bool IsEligible(OptimizerExtensionInput &input, const LogicalOperator &op) {

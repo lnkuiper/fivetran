@@ -325,9 +325,15 @@ static bool StructToSparseVariant(DataChunk &args, ExpressionState &, Vector &re
 
 } // namespace variant
 
+static unique_ptr<FunctionData> StructToSparseVariantBind(ClientContext &context, ScalarFunction &bound_function,
+                                                          vector<unique_ptr<Expression>> &arguments) {
+	bound_function.arguments[0] = arguments[0]->return_type;
+	return nullptr;
+}
+
 ScalarFunction FivetranFunctions::GetStructToSparseVariantFunction() {
-	ScalarFunction fun("struct_to_sparse_variant", {LogicalType::STRUCT({{"any", LogicalType::ANY}})},
-	                   LogicalType::VARIANT(), variant::StructToSparseVariant);
+	ScalarFunction fun("struct_to_sparse_variant", {LogicalTypeId::STRUCT}, LogicalType::VARIANT(),
+	                   variant::StructToSparseVariant, StructToSparseVariantBind);
 	return fun;
 }
 
