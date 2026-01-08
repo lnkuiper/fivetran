@@ -4,6 +4,7 @@
 
 #include "duckdb/function/scalar/struct_functions.hpp"
 #include "duckdb/function/scalar/variant_functions.hpp"
+#include "duckdb/main/client_context.hpp"
 #include "duckdb/main/config.hpp"
 #include "duckdb/optimizer/optimizer.hpp"
 #include "duckdb/optimizer/column_binding_replacer.hpp"
@@ -48,9 +49,9 @@ private:
 		const auto &comparison_join = op.Cast<LogicalComparisonJoin>();
 		switch (comparison_join.join_type) {
 		case JoinType::LEFT:
-			return true;
-		default:
 			break;
+		default:
+			return false;
 		}
 
 		for (const auto &condition : comparison_join.conditions) {
@@ -60,8 +61,7 @@ private:
 		}
 
 		Value threshold_value;
-		DBConfig::GetConfig(input.context)
-		    .TryGetCurrentSetting(SparseBuildOptimizerColumnsThresholdSetting::NAME, threshold_value);
+		input.context.TryGetCurrentSetting(SparseBuildOptimizerColumnsThresholdSetting::NAME, threshold_value);
 		const auto threshold = threshold_value.GetValue<int64_t>();
 		if (threshold < 0) {
 			return false;
