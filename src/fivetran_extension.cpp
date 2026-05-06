@@ -10,6 +10,11 @@
 #include "duckdb/function/scalar_function.hpp"
 #include "duckdb/parser/parsed_data/create_scalar_function_info.hpp"
 
+// Detect DuckDB v1.5+ (optimizer_extensions moved to OptimizerExtension::Register)
+#if __has_include("duckdb/common/column_index_map.hpp")
+#define DUCKDB_V15
+#endif
+
 namespace duckdb {
 
 template <class SETTING>
@@ -19,9 +24,15 @@ void AddSetting(DBConfig &config) {
 
 static void LoadInternal(ExtensionLoader &loader) {
 	loader.RegisterFunction(FivetranFunctions::GetStructToSparseVariantFunction());
-	loader.GetDatabaseInstance().config.optimizer_extensions.push_back(FivetranOptimizers::GetSparseBuildOptimizer());
 
-	auto &config = DBConfig::GetConfig(loader.GetDatabaseInstance());
+	auto &db = loader.GetDatabaseInstance();
+	auto &config = DBConfig::GetConfig(db);
+#ifdef DUCKDB_V15
+	OptimizerExtension::Register(config, FivetranOptimizers::GetSparseBuildOptimizer());
+#else
+	db.config.optimizer_extensions.push_back(FivetranOptimizers::GetSparseBuildOptimizer());
+#endif
+
 	AddSetting<SparseBuildOptimizerColumnsThresholdSetting>(config);
 }
 
