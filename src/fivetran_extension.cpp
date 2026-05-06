@@ -1,5 +1,6 @@
 #define DUCKDB_EXTENSION_MAIN
 
+#include "common.hpp"
 #include "fivetran_extension.hpp"
 #include "functions.hpp"
 #include "optimizers.hpp"
@@ -9,11 +10,6 @@
 #include "duckdb/common/exception.hpp"
 #include "duckdb/function/scalar_function.hpp"
 #include "duckdb/parser/parsed_data/create_scalar_function_info.hpp"
-
-// Detect DuckDB v1.5+ (optimizer_extensions moved to OptimizerExtension::Register)
-#if __has_include("duckdb/common/column_index_map.hpp")
-#define DUCKDB_V15
-#endif
 
 namespace duckdb {
 
