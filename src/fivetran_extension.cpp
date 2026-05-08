@@ -19,9 +19,11 @@ void AddSetting(DBConfig &config) {
 
 static void LoadInternal(ExtensionLoader &loader) {
 	loader.RegisterFunction(FivetranFunctions::GetStructToSparseVariantFunction());
-	loader.GetDatabaseInstance().config.optimizer_extensions.push_back(FivetranOptimizers::GetSparseBuildOptimizer());
 
-	auto &config = DBConfig::GetConfig(loader.GetDatabaseInstance());
+	auto &db = loader.GetDatabaseInstance();
+	auto &config = DBConfig::GetConfig(db);
+	OptimizerExtension::Register(config, FivetranOptimizers::GetSparseBuildOptimizer());
+
 	AddSetting<SparseBuildOptimizerColumnsThresholdSetting>(config);
 }
 
