@@ -1,4 +1,3 @@
-#include "common.hpp"
 #include "functions.hpp"
 
 #include "duckdb/function/cast/default_casts.hpp"
@@ -14,21 +13,6 @@
 namespace duckdb {
 
 namespace variant {
-
-#ifndef DUCKDB_V15
-void InitializeOffsets(DataChunk &offsets, idx_t count) {
-	auto keys = OffsetData::GetKeys(offsets);
-	auto children = OffsetData::GetChildren(offsets);
-	auto values = OffsetData::GetValues(offsets);
-	auto blob = OffsetData::GetBlob(offsets);
-	for (idx_t i = 0; i < count; i++) {
-		keys[i] = 0;
-		children[i] = 0;
-		values[i] = 0;
-		blob[i] = 0;
-	}
-}
-#endif
 
 static void InitializeVariants(DataChunk &offsets, Vector &result, SelectionVector &keys_selvec, idx_t &selvec_size,
                                OrderedOwningStringMap<uint32_t> &dictionary) {

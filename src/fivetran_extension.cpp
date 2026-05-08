@@ -1,6 +1,5 @@
 #define DUCKDB_EXTENSION_MAIN
 
-#include "common.hpp"
 #include "fivetran_extension.hpp"
 #include "functions.hpp"
 #include "optimizers.hpp"
@@ -23,11 +22,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 
 	auto &db = loader.GetDatabaseInstance();
 	auto &config = DBConfig::GetConfig(db);
-#ifdef DUCKDB_V15
 	OptimizerExtension::Register(config, FivetranOptimizers::GetSparseBuildOptimizer());
-#else
-	db.config.optimizer_extensions.push_back(FivetranOptimizers::GetSparseBuildOptimizer());
-#endif
 
 	AddSetting<SparseBuildOptimizerColumnsThresholdSetting>(config);
 }
